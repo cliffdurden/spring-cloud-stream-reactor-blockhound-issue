@@ -36,6 +36,7 @@ public class DemoAppTest {
     public static void setup() {
         BlockHound.install();
         System.setProperty("spring.cloud.stream.kafka.binder.brokers", embeddedKafka.getEmbeddedKafka().getBrokersAsString());
+        System.setProperty("spring.kafka.bootstrap-servers", embeddedKafka.getEmbeddedKafka().getBrokersAsString());
     }
 
     @Test

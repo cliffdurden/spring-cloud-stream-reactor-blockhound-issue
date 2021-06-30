@@ -2,22 +2,14 @@ package ru.vichukano.demo;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.kafka.core.*;
 import reactor.blockhound.BlockHound;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.netty.http.client.HttpClient;
+import reactor.core.publisher.*;
 
-import java.time.Duration;
-import java.util.function.Function;
+import java.util.function.Consumer;
 
-@RestController
 @SpringBootApplication
 public class DemoApp {
 
@@ -27,33 +19,18 @@ public class DemoApp {
     }
 
     @Bean
-    public Function<Flux<String>, Flux<String>> process(WebClient webClient) {
-        return flux -> flux
-                .flatMap(f -> getBar(webClient, f))
-                .map(String::toUpperCase);
-    }
-
-    @PostMapping(path = "/bar")
-    public String bar(@RequestBody String body) {
-        return body + "bar";
+    KafkaTemplate<String, String> kafkaTemplate(KafkaProperties kafkaProperties) {
+        kafkaProperties.setClientId("demo-app");
+        DefaultKafkaProducerFactory<String, String> pf = new DefaultKafkaProducerFactory<>(kafkaProperties.buildProducerProperties());
+        return new KafkaTemplate<>(pf, kafkaProperties.buildProducerProperties());
     }
 
     @Bean
-    public WebClient webClient() {
-        HttpClient httpClient = HttpClient.create()
-                .responseTimeout(Duration.ofSeconds(1));
-        return WebClient.builder()
-                .baseUrl("http://localhost:8080/")
-                .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .build();
+    public Consumer<Flux<String>> process(KafkaTemplate<String, String> kafkaTemplate) {
+        return flux -> flux
+                .flatMap(f -> Mono.just("FOOBAR"))
+                .map(String::toUpperCase)
+                .map(mes -> kafkaTemplate.send("output", mes))
+                .subscribe();
     }
-
-    private Mono<String> getBar(WebClient client, String body) {
-        return client.post()
-                .uri("/bar")
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(String.class);
-    }
-
 }
